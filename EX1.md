@@ -1,13 +1,23 @@
 ns1            ns2
  veth0 ---- veth1
 
-sudo ip netns add ns1
-sudo ip netns add ns2
+
+docker run -dit --name container1 --network none alpine sh
+docker run -dit --name container2 --network none alpine sh
+
+PID1=$(docker inspect -f '{{.State.Pid}}' container1)
+PID2=$(docker inspect -f '{{.State.Pid}}' container2)
+
+
+linko i network settings dei docker 
+
+mkdir -p /var/run/netns
+ln -s /proc/$PID1/ns/net /var/run/netns/ns1
+ln -s /proc/$PID2/ns/net /var/run/netns/ns2
 
 ip netns list
 -    ns1
 -    ns2
-
 
 connetto direttamente con veth:
 (veth0 in ns1 connected to veth1 in ns2)
@@ -22,6 +32,8 @@ sudo ip netns exec ns1 ip link
         link/ether 36:be:08:32:11:e4 brd ff:ff:ff:ff:ff:ff link-netns ns2
     --- notare che è DOWN, devo aggiungere ip alla veth0 rendo up sia veth0 che l0
 
+dentro il ns 1:
+
 sudo ip netns exec ns1 ip addr add 10.0.0.1/24 dev veth0
 sudo ip netns exec ns1 ip link set veth0 up
 sudo ip netns exec ns1 ip link set lo up
@@ -33,7 +45,7 @@ sudo ip netns exec ns1 ip link
     2: veth0@if2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP mode DEFAULT group default qlen 1000
         link/ether 36:be:08:32:11:e4 brd ff:ff:ff:ff:ff:ff link-netns ns2
 
-faccio stessa cosa per ns2:
+faccio stessa cosa dentro ns2:
 
 sudo ip netns exec ns2 ip addr add 10.0.0.2/24 dev veth1
 sudo ip netns exec ns2 ip link set veth1 up
@@ -111,10 +123,10 @@ sudo ip netns exec ns1 iperf3 -c 192.168.10.2 | tee iperf3_bridge.txt
 
 
 ####  NON VA
-                       vx-net-0             vxlan-tunnel             vx-net-1
-           vx-veth0-br -------- vx-veth0-mid ========== vx-veth1-mid -------- vx-veth1-br
-ns1       /                                                                             \      ns2
-  vx-veth0                                                                               vx-veth1  
+                       vx-net-0              vxlan-tunnel              vx-net-1
+           vx-veth0-br -------- vx-veth0-mid ============ vx-veth1-mid -------- vx-veth1-br
+ns1       /                                                                               \      ns2
+  vx-veth0                                                                                vx-veth1  
 
 sudo ip netns add ns1
 sudo ip netns add ns2
