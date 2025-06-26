@@ -4,7 +4,7 @@ ns1            ns2
 
 docker run -dit --name container1 --network none alpine sh
 docker run -dit --name container2 --network none alpine sh
-
+GitRepos
 PID1=$(docker inspect -f '{{.State.Pid}}' container1)
 PID2=$(docker inspect -f '{{.State.Pid}}' container2)
 
@@ -116,66 +116,76 @@ sudo ip link set b-veth1-br up
 
 sudo ip netns exec ns1 ping 192.168.10.2
 
+sudo ip netns exec ns2 iperf3 -s
+
 sudo ip netns exec ns1 iperf3 -c 192.168.10.2 | tee iperf3_bridge.txt
 
 
 ----------------------------------------------------------------------------
 
+                       vx-net-0                  vxlan-tunnel                  vx-net-1
+           vx-veth0-br -------- vx-veth0-mid   vxlan1====vxlan2   vx-veth1-mid -------- vx-veth1-br
+    ns1   /                                                                                        \   ns2
+  vx-veth0                                                                                          vx-veth1  
 
-####  NON VA
-                       vx-net-0              vxlan-tunnel              vx-net-1
-           vx-veth0-br -------- vx-veth0-mid ============ vx-veth1-mid -------- vx-veth1-br
-ns1       /                                                                               \      ns2
-  vx-veth0                                                                                vx-veth1  
+# Collegamento tra due namespace tramite bridge e VXLAN
 
+## 1. Crea i namespace
+```sh
+```sh
+# 1. Crea i namespace
 sudo ip netns add ns1
 sudo ip netns add ns2
 
+# 2. Crea la veth pair per il traffico VXLAN (rimane nel namespace root)
+sudo ip link add vx-veth0-mid type veth peer name vx-veth1-mid
+
+# 3. Crea le veth per i bridge e spostale nei namespace
+sudo ip link add vx-veth0 type veth peer name vx-veth0-br
+sudo ip link add vx-veth1 type veth peer name vx-veth1-br
+sudo ip link set vx-veth0 netns ns1
+sudo ip link set vx-veth1 netns ns2
+
+# 4. Crea i bridge nel namespace root
 sudo ip link add vx-net-0 type bridge
 sudo ip link add vx-net-1 type bridge
 
-
-sudo ip link add vx-veth0 type veth peer name vx-veth0-br
-sudo ip link add vx-veth1 type veth peer name vx-veth1-br
-
-
-sudo ip link set vx-veth0 netns ns1
+# 5. Collega le veth-br e le veth-mid ai bridge nel root
 sudo ip link set vx-veth0-br master vx-net-0
-
-sudo ip link set vx-veth1 netns ns2
+sudo ip link set vx-veth0-mid master vx-net-0
 sudo ip link set vx-veth1-br master vx-net-1
+sudo ip link set vx-veth1-mid master vx-net-1
 
-
-sudo ip netns exec ns1 ip addr add 192.168.60.1/24 dev vx-veth0
-sudo ip netns exec ns2 ip addr add 192.168.60.2/24 dev vx-veth1
-
-sudo ip addr add 192.168.60.3/24 dev vx-veth0-br
-sudo ip addr add 192.168.60.4/24 dev vx-veth1-br
-
-sudo ip link add vxlan0 type vxlan id 43 dev vx-veth0-br remote 192.168.60.4 dstport 4789
-sudo ip link add vxlan1 type vxlan id 43 dev vx-veth1-br remote 192.168.60.3 dstport 4789
-
-sudo ip netns exec ns1 ip link set vx-veth0 address aa:aa:aa:aa:aa:01
-sudo ip netns exec ns2 ip link set vx-veth1 address aa:aa:aa:aa:aa:02
-
-sudo bridge fdb add aa:aa:aa:aa:aa:02 dev vxlan0 dst 192.168.60.4
-sudo bridge fdb add aa:aa:aa:aa:aa:01 dev vxlan1 dst 192.168.60.3
-
-sudo ip link set vxlan0 master vx-net-0
-sudo ip link set vxlan1 master vx-net-1
-
-
-sudo ip netns exec ns1 ip link set lo up
-sudo ip netns exec ns2 ip link set lo up
+# 6. Attiva bridge e interfacce nel root
 sudo ip link set vx-net-0 up
 sudo ip link set vx-net-1 up
-sudo ip netns exec ns1 ip link set vx-veth0 up
-sudo ip netns exec ns2 ip link set vx-veth1 up
-sudo ip link set vxlan0 up
-sudo ip link set vxlan1 up
 sudo ip link set vx-veth0-br up
 sudo ip link set vx-veth1-br up
+sudo ip link set vx-veth0-mid up
+sudo ip link set vx-veth1-mid up
 
+# 7. Attiva le veth nei namespace e assegna IP
+sudo ip netns exec ns1 ip link set vx-veth0 up
+sudo ip netns exec ns2 ip link set vx-veth1 up
+sudo ip netns exec ns1 ip addr add 192.168.60.1/24 dev vx-veth0
+sudo ip netns exec ns2 ip addr add 192.168.60.2/24 dev vx-veth1
+sudo ip netns exec ns1 ip link set lo up
+sudo ip netns exec ns2 ip link set lo up
+
+# 8. Assegna IP alle veth-mid nel root
+sudo ip addr add 10.10.10.1/24 dev vx-veth0-mid
+sudo ip addr add 10.10.10.2/24 dev vx-veth1-mid
+
+# 9. Crea e configura le interfacce VXLAN nel root
+sudo ip link add vxlan1 type vxlan id 100 local 127.0.0.1 remote 127.0.0.1 dstport 4789 dev vx-veth0-mid
+sudo ip link add vxlan2 type vxlan id 101 local 127.0.0.1 remote 127.0.0.1 dstport 4790 dev vx-veth1-mid
+
+# 10. Collega le interfacce VXLAN ai bridge e attivale
+sudo ip link set vxlan0 master vx-net-0
+sudo ip link set vxlan1 master vx-net-1
+sudo ip link set vxlan0 up
+sudo ip link set vxlan1 up
+```
 
 
 sudo ip netns del ns1
@@ -186,3 +196,4 @@ sudo ip link del vx-net-0
 sudo ip link del vx-net-1
 sudo ip link del vxlan0
 sudo ip link del vxlan1
+
