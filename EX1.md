@@ -181,10 +181,10 @@ sudo ip link add vxlan1 type vxlan id 100 local 127.0.0.1 remote 127.0.0.1 dstpo
 sudo ip link add vxlan2 type vxlan id 101 local 127.0.0.1 remote 127.0.0.1 dstport 4790 dev vx-veth1-mid
 
 # 10. Collega le interfacce VXLAN ai bridge e attivale
-sudo ip link set vxlan0 master vx-net-0
-sudo ip link set vxlan1 master vx-net-1
-sudo ip link set vxlan0 up
+sudo ip link set vxlan1 master vx-net-0
+sudo ip link set vxlan2 master vx-net-1
 sudo ip link set vxlan1 up
+sudo ip link set vxlan2 up
 ```
 
 
