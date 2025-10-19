@@ -1,9 +1,23 @@
+apiVersion: v1
 kind: Pod
 metadata:
-  name: nginx
+  name: hpl-test
 spec:
   containers:
-  - name: nginx
-    image: nginx:1.14.2
-    ports:
-    - containerPort: 80
+  - name: hpl
+    image: 192.168.0.114:5000/esame_img:1
+    workingDir: /data
+    command: ["/bin/bash", "-c", "/usr/sbin/sshd -D"]
+    volumeMounts:
+    - name: config-volume
+      mountPath: /config
+      readOnly: true
+    - name: data-volume
+      mountPath: /data
+  volumes:
+  - name: config-volume
+    configMap:
+      name: hpccinf-file
+  - name: data-volume
+    emptyDir: {}
+
