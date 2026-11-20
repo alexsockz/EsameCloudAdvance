@@ -1,0 +1,40 @@
+--- ssh check w1 ---
+hpl-multicontainer
+/usr/bin/orted
+--- ssh check w2 ---
+hpl-multicontainer
+/usr/bin/orted
+===== worker sshd logs (tail) =====
+--- w1 ---
+debug1: session_by_channel: session 0 channel 0
+debug1: session_input_channel_req: session 0 req exec
+Starting session: command for root from 127.0.0.1 port 51630 id 0
+debug1: SELinux support disabled
+debug1: permanently_set_uid: 0/0
+debug1: Received SIGCHLD.
+debug1: session_by_pid: pid 14
+debug1: session_exit_message: session 0 channel 0 pid 14 exit 0
+debug1: session_exit_message: release channel 0
+Received disconnect from 127.0.0.1 port 51630:11: disconnected by user
+Disconnected from user root 127.0.0.1 port 51630
+debug1: do_cleanup
+debug1: temporarily_use_uid: 0/0 (e=0/0)
+debug1: restore_uid: 0/0
+debug1: audit_event: unhandled event 12
+--- w2 ---
+debug1: permanently_set_uid: 0/0
+debug1: Received SIGCHLD.
+debug1: session_by_pid: pid 14
+debug1: session_exit_message: session 0 channel 0 pid 14 exit 0
+debug1: session_exit_message: release channel 0
+debug1: session_by_channel: session 0 channel 0
+debug1: session_close_by_channel: channel 0 child 0
+Close session: user root from 127.0.0.1 port 49530 id 0
+debug1: channel 0: free: server-session, nchannels 1
+Received disconnect from 127.0.0.1 port 49530:11: disconnected by user
+Disconnected from user root 127.0.0.1 port 49530
+debug1: do_cleanup
+debug1: temporarily_use_uid: 0/0 (e=0/0)
+debug1: restore_uid: 0/0
+debug1: audit_event: unhandled event 12
+===== end =====

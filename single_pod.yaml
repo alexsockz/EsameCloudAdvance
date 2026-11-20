@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hpl-single
+  namespace: hpl-test
+  labels:
+    app: hpl
+spec:
+  containers:
+  - name: hpl
+    image: alessiovalle/esame_img:1
+    imagePullPolicy: IfNotPresent
+    command:
+      - /bin/bash
+      - -c
+      - |
+        cd /data
+        mpirun --allow-run-as-root -np 4 hpcc
+        EXIT_CODE=$?
+        # The log is the only channel that survives the container exit, so the
+        # HPCC result file is printed at the end of it between two marker lines.
+        if [ -f hpccoutf.txt ]; then
+          echo "=== BEGIN hpccoutf.txt ==="
+          cat hpccoutf.txt
+          echo "=== END hpccoutf.txt ==="
+        else
+          echo "ERROR: /data/hpccoutf.txt was not generated"
+        fi
+        exit "${EXIT_CODE}"
+    resources:
+      requests:
+        cpu: "4"
+        memory: "4.5Gi"
+      limits:
+        cpu: "4"
+        memory: "4.5Gi"
+    volumeMounts:
+      - name: hpccinf-volume
+        mountPath: /data/hpccinf.txt
+        subPath: hpccinf.txt
+  volumes:
+    - name: hpccinf-volume
+      configMap:
+        name: hpccinf-config
+  restartPolicy: Never

@@ -1,0 +1,138 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hpl-multicontainer
+  namespace: hpl-test
+  labels:
+    app: hpl
+spec:
+  restartPolicy: Never
+  containers:
+  - name: hpl-master
+    image: alessiovalle/esame_img:1
+    command:
+      - /bin/bash
+      - -c
+      - |
+        mkdir -p /root/.ssh
+        cp /mnt/ssh-secret/id_rsa /root/.ssh/id_rsa
+        chmod 700 /root/.ssh; chmod 600 /root/.ssh/id_rsa
+        cat > /root/.ssh/config <<EOF
+        Host w1
+          HostName 127.0.0.1
+          Port 2222
+        Host w2
+          HostName 127.0.0.1
+          Port 2223
+        Host *
+          User root
+          IdentityFile /root/.ssh/id_rsa
+          IdentitiesOnly yes
+          StrictHostKeyChecking no
+          UserKnownHostsFile /dev/null
+          LogLevel ERROR
+        EOF
+        chmod 600 /root/.ssh/config
+
+        for h in w1 w2; do
+          for i in $(seq 1 60); do
+            ssh -o BatchMode=yes -o ConnectTimeout=3 $h true 2>/dev/null && break
+            sleep 1
+          done
+          echo "--- ssh check $h ---"
+          ssh -o BatchMode=yes -o ConnectTimeout=3 $h 'hostname; which orted' 2>&1
+        done
+
+        echo "===== worker sshd logs (tail) ====="
+        for w in w1 w2; do echo "--- $w ---"; tail -n 15 /shared/sshd-$w.log 2>&1; done
+        echo "===== end ====="
+
+        printf 'localhost slots=1\nw1 slots=1\nw2 slots=2\n' > /tmp/hostfile
+
+        cd /data
+        mpirun --allow-run-as-root \
+          --hostfile /tmp/hostfile -np 4 --wd /data \
+          --prefix "$(dirname "$(dirname "$(which mpirun)")")" \
+          --mca routed direct \
+          --mca plm_rsh_no_tree_spawn 1 \
+          --mca oob_tcp_if_include lo \
+          --mca btl tcp,self --mca btl_tcp_if_include lo \
+          "$(which hpcc)"
+        EXIT_CODE=$?
+
+        if [ -f hpccoutf.txt ]; then
+          echo "=== BEGIN hpccoutf.txt ==="
+          cat hpccoutf.txt
+          echo "=== END hpccoutf.txt ==="
+        else
+          echo "ERROR: /data/hpccoutf.txt was not generated"
+        fi
+        exit "${EXIT_CODE}"
+    volumeMounts:
+      - {name: hpccinf-volume, mountPath: /data/hpccinf.txt, subPath: hpccinf.txt}
+      - {name: ssh-key, mountPath: /mnt/ssh-secret, readOnly: true}
+      - {name: shared, mountPath: /shared}
+    resources:
+      requests: {cpu: "1", memory: "2Gi"}
+      limits:   {cpu: "1", memory: "2Gi"}
+
+  - name: hpl-worker-1
+    image: alessiovalle/esame_img:1
+    securityContext:
+      capabilities:
+        add: ["SYS_CHROOT", "SETUID", "SETGID", "CHOWN", "DAC_OVERRIDE", "KILL", "AUDIT_WRITE"]
+    command:
+      - /bin/bash
+      - -c
+      - |
+        mkdir -p /root/.ssh /run/sshd
+        chmod 755 /run/sshd
+        getent passwd sshd >/dev/null || useradd -r -d /run/sshd -s /usr/sbin/nologin sshd
+        cp /mnt/ssh-secret/id_rsa.pub /root/.ssh/authorized_keys
+        chmod 700 /root/.ssh; chmod 600 /root/.ssh/authorized_keys
+        ssh-keygen -A
+        exec /usr/sbin/sshd -D -p 2222 -E /shared/sshd-w1.log -o LogLevel=DEBUG1 \
+          -o PermitRootLogin=yes -o StrictModes=no -o UsePAM=no -o UseDNS=no
+    volumeMounts:
+      - {name: hpccinf-volume, mountPath: /data/hpccinf.txt, subPath: hpccinf.txt}
+      - {name: ssh-key, mountPath: /mnt/ssh-secret, readOnly: true}
+      - {name: shared, mountPath: /shared}
+    resources:
+      requests: {cpu: "2", memory: "2Gi"}
+      limits:   {cpu: "2", memory: "2Gi"}
+
+  - name: hpl-worker-2
+    image: alessiovalle/esame_img:1
+    securityContext:
+      capabilities:
+        add: ["SYS_CHROOT", "SETUID", "SETGID", "CHOWN", "DAC_OVERRIDE", "KILL", "AUDIT_WRITE"]
+    command:
+      - /bin/bash
+      - -c
+      - |
+        mkdir -p /root/.ssh /run/sshd
+        chmod 755 /run/sshd
+        getent passwd sshd >/dev/null || useradd -r -d /run/sshd -s /usr/sbin/nologin sshd
+        cp /mnt/ssh-secret/id_rsa.pub /root/.ssh/authorized_keys
+        chmod 700 /root/.ssh; chmod 600 /root/.ssh/authorized_keys
+        ssh-keygen -A
+        exec /usr/sbin/sshd -D -p 2223 -E /shared/sshd-w2.log -o LogLevel=DEBUG1 \
+          -o PermitRootLogin=yes -o StrictModes=no -o UsePAM=no -o UseDNS=no
+    volumeMounts:
+      - {name: hpccinf-volume, mountPath: /data/hpccinf.txt, subPath: hpccinf.txt}
+      - {name: ssh-key, mountPath: /mnt/ssh-secret, readOnly: true}
+      - {name: shared, mountPath: /shared}
+    resources:
+      requests: {cpu: "2", memory: "2Gi"}
+      limits:   {cpu: "2", memory: "2Gi"}
+
+  volumes:
+    - name: hpccinf-volume
+      configMap:
+        name: hpccinf-config
+    - name: ssh-key
+      secret:
+        secretName: mpi-ssh-key
+        defaultMode: 0444
+    - name: shared
+      emptyDir: {}

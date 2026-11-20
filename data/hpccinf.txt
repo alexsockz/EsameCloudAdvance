@@ -2,14 +2,14 @@ HPLinpack benchmark input file
 Innovative Computing Laboratory, University of Tennessee
 HPL.out      output file name (if any) 
 6            device out (6=stdout,7=stderr,file)
-1            # of problems sizes (N)
-20352        Ns
-3            # of NBs
-96 192 384   NBs
+3            # of problems sizes (N)
+8000 12000 14000 Ns
+1            # of NBs
+192          NBs
 0            PMAP process mapping (0=Row-,1=Column-major)
-3            # of process grids (P x Q)
-1 2 4        Ps
-4 2 1        Qs
+1            # of process grids (P x Q)
+2            Ps
+2            Qs
 16.0         threshold
 1            # of panel fact
 2            PFACTs (0=left, 1=Crout, 2=Right)
@@ -31,6 +31,6 @@ HPL.out      output file name (if any)
 8            memory alignment in double (> 0)
 ##### This line (no. 32) is ignored (it serves as a separator). ######
 0                               Number of additional problem sizes for PTRANS
-1200 10000 30000                values of N
+4000 8000 12000                 values of N
 0                               number of additional blocking sizes for PTRANS
 40 9 8 13 13 20 16 32 64        values of NB

@@ -196,4 +196,3 @@ sudo ip link del vx-net-0
 sudo ip link del vx-net-1
 sudo ip link del vxlan0
 sudo ip link del vxlan1
-

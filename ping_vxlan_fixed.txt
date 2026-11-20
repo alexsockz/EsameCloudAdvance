@@ -1,0 +1,5 @@
+PING 192.168.60.2 (192.168.60.2) 56(84) bytes of data.
+
+--- 192.168.60.2 ping statistics ---
+100 packets transmitted, 100 received, 0% packet loss, time 20587ms
+rtt min/avg/max/mdev = 0.055/0.087/0.139/0.018 ms
